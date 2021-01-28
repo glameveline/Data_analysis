@@ -1,0 +1,192 @@
+---
+title: "World suicide analysis"
+author: Eveline Xu xuehui
+date: 2020/12/1
+
+output: html_notebook
+---
+
+```{r Outline}
+```
+# Table of contents:
+1) Data source
+2) Preprocessing
+3) Data Analysis
+4) Overall view and Foundings
+5) Interpretation and Suggestion
+```{r}
+```
+# Data source
+Suicide data. (2020). from https://www.who.int/teams/mental-health-and-substance-use/suicide-data
+
+# References
+- World Health Organization. (2018). Suicide prevention，from http://www.who.int/mental_health/suicide-prevention/en/
+
+- "Gender Differences In Suicide". 2020. En.Wikipedia.Org. https://en.wikipedia.org/wiki/Gender_differences_in_suicide#:~:text=Globally%2C%20death%20by%20suicide%20occurred,over%20the%20age%20of%2065.
+
+```{r}
+```
+### Importing Data and Libraries
+```{r}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+suicideData <- read_csv("/Users/glameveline/RProjects/Fianl project/suicideData.csv")
+head(suicideData)
+```
+```{r md}
+```
+# Preprocessing
+### Dealling with missing values
+```{r}
+summary(suicideData)
+```
+Found missing values in suicides_no and population
+```{r}
+table(is.na(suicideData$suicides_no))
+table(is.na(suicideData$population))
+```
+## Data analysis
+#### - Rate of suicide per 100k in 1995, 2005 and 2015
+```{r by year line}
+suicide_year <- suicideData %>%
+  filter(!is.na(population) & !is.na(suicides_no)) %>%
+  select(year,suicides_no,population) %>%
+  group_by(year) %>%
+  summarise(suicide_ratio=round((sum(suicides_no)/sum(population))*100000,2))
+suicide_year
+```
+```{r vidualization1}
+ggplot(data=suicide_year,aes(x=year,y=suicide_ratio))+geom_line()+
+  geom_point(colour = "red") +
+  geom_text(aes(label = suicide_ratio, vjust =-2, hjust =0.5))+
+  ylim(0,20)+
+  labs(
+    title = "World suicide rate trend over 20 years",
+    subtitle = "1995,2005 and 2005",
+    y = "Suicide Rate per 100K")
+```
+
+#### - suicide rate by age group from 1995 to 2015
+
+```{r}
+suicide_age <-  suicideData %>%
+  filter(!is.na(population) & !is.na(suicides_no)) %>%
+  select(year,age,suicides_no,population) %>%
+  group_by(age,year) %>%
+  summarise(suicide_ratio=round((sum(suicides_no)/sum(population))*100000,2))
+
+suicide_age
+
+
+ggplot(data=suicide_age,aes(x=year,y=suicide_ratio, group=age,color=age))+
+  geom_line()+
+  geom_point()+
+        geom_text(aes(label = suicide_ratio, vjust =-2, hjust =0.5))+
+  ggtitle("World suicide rate by age group in the previous 20 years")+
+  labs(
+    y="Suicide Rate per 100K"
+  )
+```
+
+#### - Top 10 suicide rate regions in 2015
+```{r}
+# top 10 per 100 k by region(country) in 2015
+top10_suicide_country <- suicideData %>%
+  filter(!is.na(population) & !is.na(suicides_no) & year=='2015') %>%
+  select(country,suicides_no,population) %>%
+  group_by(country) %>%
+  summarise(suicide_ratio=round((sum(suicides_no)/sum(population))*100000,2)) %>%
+  arrange(desc(suicide_ratio)) %>%
+  head(10)
+
+top10_suicide_country
+
+
+plot_ly(data = top10_suicide_country,x=~reorder(country,-suicide_ratio),y=~suicide_ratio,type ='bar',color=top10_suicide_country$country,colors=c('Paired')) %>%
+  layout(title='World Top10 suicide commited regions in 2015',
+         yaxis=list(title='Suicide rate per 100K'),xaxis=list(title='Country'))
+```
+#### - Choropleth map of suicide rate in the year of 2015
+```{r}
+# Choropleth map of suicide rate in the year of 2015
+
+suicide_country <- suicideData %>%
+  filter(!is.na(population) & !is.na(suicides_no) & year=='2015') %>%
+  select(country,suicides_no,population) %>%
+  group_by(country) %>%
+  summarise(suicide_ratio=round((sum(suicides_no)/sum(population))*100000,2))
+suicide_country <- rename(suicide_country,region=country)
+
+# importing world map
+world_map <- map_data('world')
+str(world_map)
+# changing names of certain countries
+world_map$region <- ifelse(world_map$region=='USA',"United States of America",world_map$region)
+head(world_map,n=20)
+
+# suicide map
+world_suicide <- left_join(world_map,suicide_country,by='region')
+head(world_suicide)
+
+# vidualization
+arrange(world_suicide, order) %>%
+  ggplot(aes(long, lat, group = group, fill =suicide_ratio)) +
+  geom_polygon() +
+  xlim(-110,150)+ylim(-20,90)+
+  coord_map("polyconic") +
+  theme(panel.grid =element_blank())+
+  scale_fill_continuous(low = "green", high = "red")+
+  labs(
+    y='',
+    x=''
+  )
+```
+#### - World suicide rate per 100K by gender
+```{r}
+suicide_gender <- suicideData %>%
+  filter(!is.na(population) & !is.na(suicides_no)) %>%
+  select(sex,year,suicides_no,population) %>%
+  group_by(sex,year) %>%
+  summarise(suicide_ratio=round((sum(suicides_no)/sum(population))*100000,2))
+suicide_gender
+
+# vidualization
+plot_ly(data = suicide_gender,x=~year,y=~suicide_ratio,type ='bar',color=suicide_gender$sex,colors=c('Paired')) %>%
+  layout(title='World suicide rate per 100K by gender',
+         yaxis=list(title='Suicide rate per 100K'))
+```
+### Overview of world suicide rate and founding
+* Downward trend from 1995 to 2015
+
+* Age group of people over 75 years old is the group which committed suicide the most over 20 years.
+
+* Top 10 regions with the highest suicide rate in 2015: Lithuania, South Korea, Slovenia, Latvia, Hungary, Uruguay, Japan, Ukraine, Russia, Croatia.
+
+* More male die from suicide than women.
+
+### Interpretation and reasonings
+##### Why more male die from suicide than women?
+*This is also known as the gender paradox in suicide.
+
+* Suicide attempts are between two and four times more frequent among females.
+
+* Researchers have partly attributed the difference between attempted and completed suicides among the sexes to males using more lethal means to end their lives.
+
+##### Why most of countries in top10 suicide rate are in East Europe?
+* Economic crisis after collapse of USSR.
+* Civil war.
+
+### Suicide prevention
+- September 10 has been observed as 'World Suicide Prevention Day' in partnership with the International Association for Suicide Prevention and the World Health Organization.
+
+- South Korea Suicide Hotlines
+http://www.suicide.org/hotlines/international/south-korea-suicide-hotlines.html
+
+- Talk therapy
+
+- Suicide Survivors are Heroes
+
+
+
